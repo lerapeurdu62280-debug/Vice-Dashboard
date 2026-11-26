@@ -1,0 +1,9 @@
+textual
+psutil
+pygame
+mutagen
+numpy
+soundfile
+pillow
+textual-image
+pywin32; sys_platform == "win32"
