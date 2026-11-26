@@ -58,7 +58,7 @@ Les favoris sont gardés dans `~/.vice_dashboard_favoris.json`.
 
 ## Bon à savoir
 
-- **Le terminal compte.** [Windows Terminal](https://aka.ms/terminal) donne le meilleur rendu. Si le terminal sait afficher des images (sixel, kitty), la pochette est nette ; sinon elle s'affiche en blocs de couleur, comme sur la capture.
+- **Le terminal compte.** [Windows Terminal](https://aka.ms/terminal) donne le meilleur rendu : graphes fins en braille et coins arrondis. Dans l'ancienne console Windows, dont la police n'a pas ces caractères, le dashboard passe tout seul en graphes à blocs et en cadres droits. Si le terminal sait afficher des images (sixel, kitty), la pochette est nette ; sinon elle s'affiche en blocs de couleur, comme sur la capture.
 - **Pas de couleurs ?** Vérifie que la variable d'environnement `NO_COLOR` n'est pas définie. Tu peux aussi forcer les couleurs avec `set TEXTUAL_COLOR_SYSTEM=truecolor`.
 - **Températures** : Windows ne les fournit pas sans pilote tiers, elles ne sont donc pas affichées.
 - **Spectre des M4A** : la librairie audio ne sait pas les décoder, le spectre est alors simulé.

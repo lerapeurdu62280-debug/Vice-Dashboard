@@ -69,6 +69,11 @@ COUCHANT = ["#ffe066", "#ffb03a", "#ff8a3d", "#ff4f6d", "#ff2e88", "#c03aa8"]  #
 GRAPHE = [ROSE, "#c86ad0", "#6ea0f0", BLEU]  # haut -> bas des graphes
 DEGRADE = ["#b14aed", "#d23fc8", "#ff2e88", "#ff4f6d", "#ff6b4a", "#ff8a3d", "#ffb03a", "#ffd23f"]  # spectre haut -> bas
 EXTS = {".mp3", ".flac", ".wav", ".ogg", ".m4a"}
+# Windows Terminal a les caractères braille et les coins arrondis ; la console classique (Consolas) non
+TERMINAL_RICHE = bool(os.environ.get("WT_SESSION")) or os.name != "nt"
+BORD = "round" if TERMINAL_RICHE else "solid"
+BLOCS = " ▁▂▃▄▅▆▇█" if TERMINAL_RICHE else " ▄█"  # Consolas n'a que le demi et le plein bloc
+NIV = len(BLOCS) - 1
 FAVORIS = Path.home() / ".vice_dashboard_favoris.json"
 
 # points braille remplis depuis le bas : colonne gauche / colonne droite
@@ -156,6 +161,13 @@ def coupe(s: str, n: int) -> str:
 def graphe(valeurs, largeur: int, hauteur: int):
     """Graphe braille (valeurs 0..100, la plus récente à droite) -> liste de lignes."""
     largeur, hauteur = max(1, largeur), max(1, hauteur)
+    if not TERMINAL_RICHE:  # repli en blocs : 1 valeur par caractère, 8 niveaux par ligne
+        v = ([0.0] * largeur + list(valeurs))[-largeur:]
+        niv = [round(x / 100 * hauteur * NIV) for x in v]
+        lignes = ["".join(BLOCS[min(NIV, max(0, n - (hauteur - 1 - r) * NIV))] for n in niv)
+                  for r in range(hauteur)]
+        lignes[-1] = "".join("·" if n == 0 else ch for n, ch in zip(niv, lignes[-1]))  # ligne de base pointillée
+        return lignes
     v = ([0.0] * (2 * largeur) + list(valeurs))[-2 * largeur:]
     pts = [max(1, round(x / 100 * hauteur * 4)) for x in v]  # 1 point mini = ligne pointillée btop
     lignes = []
@@ -309,18 +321,18 @@ class Dashboard(App):
     Screen {{ background: {FOND}; color: #e5e1ff; }}
     #topbar {{ height: 1; padding: 0 1; }}
     #banniere {{ height: 5; }}
-    #sys {{ height: 12; border: round {CADRE_SYS}; border-title-color: {BLEU}; }}
+    #sys {{ height: 12; border: {BORD} {CADRE_SYS}; border-title-color: {BLEU}; }}
     #sysgauche {{ width: 1fr; }}
     #cpugraphe {{ height: 1fr; }}
     #gpugraphe {{ height: 4; }}
-    #cpuinfo {{ width: 54; border: round {CADRE_SYS}; border-title-color: {ORANGE}; padding: 0 1; }}
-    #mem {{ height: 9; border: round {CADRE_SYS}; border-title-color: {BLEU}; padding: 0 1; }}
+    #cpuinfo {{ width: 54; border: {BORD} {CADRE_SYS}; border-title-color: {ORANGE}; padding: 0 1; }}
+    #mem {{ height: 9; border: {BORD} {CADRE_SYS}; border-title-color: {BLEU}; padding: 0 1; }}
     #fil {{ height: 1; padding: 0 1; }}
     #music {{ height: 1fr; min-height: 14; }}
     #left {{ width: 50%; }}
-    #playlist {{ height: 1fr; border: round {ROSE}; border-title-color: {ORANGE}; background: {FOND}; }}
-    #spectre {{ height: 10; border: round {ROSE}; padding: 0 1; }}
-    #now {{ width: 1fr; border: round {ROSE}; padding: 0 1; }}
+    #playlist {{ height: 1fr; border: {BORD} {ROSE}; border-title-color: {ORANGE}; background: {FOND}; }}
+    #spectre {{ height: 10; border: {BORD} {ROSE}; padding: 0 1; }}
+    #now {{ width: 1fr; border: {BORD} {ROSE}; padding: 0 1; }}
     #cover {{ height: 1fr; }}
     #info {{ height: 6; content-align: center middle; text-align: center; }}
     #controls {{ height: 2; padding: 0 1; }}
@@ -584,17 +596,17 @@ class Dashboard(App):
         bat = psutil.sensors_battery()
 
         # barre du haut
-        top = Text(" ⛨ ", style=ROSE)
+        top = Text(" ")
         for num, nom, coul in (("1", "sys", ROSE), ("2", "mem", ORANGE)):
             visible = not self.query_one(f"#{nom}").has_class("cache")
             top.append(f" {num} ", style=f"bold #0a0614 on {coul}" if visible else f"{GRIS} on #1e0b2e")
             top.append(" ")
-        top.append(f"  ◔ {total:.0f}%", style=BLEU)
+        top.append(f"  CPU {total:.0f}%", style=BLEU)
         if win32pdh is not None:
-            top.append(f"   ◎ {gpu_pct:.0f}%", style=ROSE)
-        top.append(f"   ⛁ {mem.percent:.0f}%", style=ORANGE)
+            top.append(f"   GPU {gpu_pct:.0f}%", style=ROSE)
+        top.append(f"   RAM {mem.percent:.0f}%", style=ORANGE)
         if self.vram_total:
-            top.append(f"   ▣ {vram_pct:.0f}%", style=VIOLET)
+            top.append(f"   VRAM {vram_pct:.0f}%", style=VIOLET)
         self.query_one("#topbar").update(top)
 
         # cadre cpu (titre façon btop)
@@ -708,11 +720,10 @@ class Dashboard(App):
         else:
             cible = [0.03] * n
         self.niveaux = [max(c, old - 0.08) for old, c in zip(self.niveaux, cible)]
-        blocs = " ▁▂▃▄▅▆▇█"
         txt = Text()
         for r in range(haut):
-            dessous = (haut - 1 - r) * 8
-            ligne = "".join(blocs[min(8, max(0, int(v * haut * 8) - dessous))] * 2 + " " for v in self.niveaux)
+            dessous = (haut - 1 - r) * NIV
+            ligne = "".join(BLOCS[min(NIV, max(0, int(v * haut * NIV) - dessous))] * 2 + " " for v in self.niveaux)
             txt.append(ligne + ("\n" if r < haut - 1 else ""),
                        style=DEGRADE[min(len(DEGRADE) - 1, r * len(DEGRADE) // haut)])
         w.update(txt)
